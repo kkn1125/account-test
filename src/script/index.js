@@ -346,7 +346,7 @@ const account = (function () {
       document
         .querySelectorAll(`.sheet[page-id]`)
         .forEach((el) => el.classList.remove("selected"));
-      this.$(`.sheet[data-page-id="${accountBook.current}"]`).classList.add(
+      this.$(`.sheet[data-page-id="${accountBook.current}"]`)?.classList.add(
         "selected"
       );
     };
