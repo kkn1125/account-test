@@ -141,26 +141,26 @@ const account = (function () {
       const from = document.querySelector("#from");
       const to = document.querySelector("#to");
 
-      if (values.trim().length === 0) {
-        return;
-      } else {
-        crud.addItem({
-          memo: values.trim(),
-          inout: inout.value,
-          amount: Number(amount.value),
-          category: category.value,
-          tags: tags.value.split(/,\s*/g).filter((_) => _),
-          from: from.value,
-          to: to.value,
-        });
-        ta.value = "";
-        inout.value = "0";
-        amount.value = "0";
-        category.value = "";
-        tags.value = "";
-        from.value = "";
-        to.value = "";
-      }
+      // if (values.trim().length === 0) {
+      //   return;
+      // } else {
+      crud.addItem({
+        memo: values.trim(),
+        inout: inout.value,
+        amount: Number(amount.value),
+        category: category.value,
+        tags: tags.value.split(/,\s*/g).filter((_) => _),
+        from: from.value,
+        to: to.value,
+      });
+      ta.value = "";
+      inout.value = "0";
+      amount.value = "0";
+      category.value = "";
+      tags.value = "";
+      from.value = "";
+      to.value = "";
+      // }
     };
 
     this.handleDeleteItem = (e) => {
@@ -234,6 +234,7 @@ const account = (function () {
   function Model() {
     let accountBook = {
       current: 0,
+      purpose: 500_000,
       pages: [],
     };
     let options = null;
@@ -318,17 +319,18 @@ const account = (function () {
 
       if (
         !confirm(
-          `${page.data[index].inout ? "입금" : "출금"} | ${
-            page.data[index].memo
-          } 를 지우시겠습니까?`
+          `[${page.data[index].inout ? "입금" : "출금"}] "${page.data[
+            index
+          ].amount.toLocaleString()}원" 레코드를 지우시겠습니까?`
         )
       ) {
+        //
       } else {
         if (index > -1) {
           page.data.splice(index, 1);
         }
+        this.save();
       }
-      this.save();
     };
 
     this.findIndex = (object, id) => {
@@ -351,6 +353,22 @@ const account = (function () {
         localStorage.setItem("accountbook", JSON.stringify(accountBook));
       }
       const temp = JSON.parse(localStorage.getItem("accountbook"));
+      const ab = Object.keys(accountBook);
+      const tp = Object.keys(temp);
+      const excludes = [];
+      if (ab.length < tp.length) {
+        for (let t of tp) {
+          if (!accountBook[t]) {
+            excludes.push(t);
+          } else {
+            continue;
+          }
+        }
+        for (let ex of excludes) {
+          delete temp[ex];
+        }
+      }
+
       Object.assign(accountBook, {
         ...temp,
         pages: temp.pages.map(
@@ -362,7 +380,7 @@ const account = (function () {
             )
         ),
       });
-      this.update();
+      this.save();
     };
 
     this.save = () => {
@@ -391,15 +409,17 @@ const account = (function () {
     };
 
     this.update = (accountBook) => {
-      const { page, item } = options;
-      view.update(page, item, accountBook);
+      const { page, item, column } = options;
+      view.update({ page, item, column }, accountBook);
     };
   }
 
   function View() {
     let options = null;
     let app = null;
-    let board = null;
+    let purpose = null;
+    let thead = null;
+    let tbody = null;
     let sheets = null;
 
     this.init = (_options) => {
@@ -413,34 +433,54 @@ const account = (function () {
     this.render = (ui) => {
       app = this.$("#app");
       app.innerHTML = ui || "";
-      board = this.$("#board");
+      purpose = this.$("#purpose");
+      thead = this.$("#thead");
+      tbody = this.$("#tbody");
       sheets = this.$("#sheets");
     };
 
-    this.update = (pageTemplate, itemTemplate, accountBook) => {
+    this.update = (
+      { page: pageTemplate, item: itemTemplate, column: columnTemplate },
+      accountBook
+    ) => {
       let total = 0;
+      let inn = 0;
+      let out = 0;
 
       for (let el of [...sheets.children]) {
         if (!el.classList.contains("create")) {
           el.remove();
         }
       }
-      for (let el of [...board.children]) {
+      for (let el of [...thead.children]) {
+        el.remove();
+      }
+      for (let el of [...tbody.children]) {
         if (!el.classList.contains("total")) {
           el.remove();
         }
       }
+      purpose.innerHTML = "";
+
       for (let page of accountBook.pages) {
         this.$(".create.sheet").insertAdjacentHTML(
           "beforebegin",
           pageTemplate(page)
         );
       }
+      this.$("#purpose").insertAdjacentHTML(
+        "beforeend",
+        accountBook.purpose.toLocaleString()
+      );
+      this.$("#thead").insertAdjacentHTML("beforeend", columnTemplate());
       for (let item of accountBook.pages[accountBook.current].data) {
-        this.$("#total").insertAdjacentHTML("beforebegin", itemTemplate(item));
-        if (item.inout) {
+        this.$("#tbody").insertAdjacentHTML("beforeend", itemTemplate(item));
+
+        if (Boolean(Number(item.inout))) {
+          inn += item.amount;
           total += item.amount;
         } else {
+          out -= item.amount;
           total -= item.amount;
         }
       }
@@ -448,6 +488,14 @@ const account = (function () {
       <hr />
       <div>
         ${total.toLocaleString()} won
+      </div>
+      <hr />
+      <div>
+        ${accountBook.purpose.toLocaleString()} ${
+        out < 0 ? "-" : "+"
+      } ${Math.abs(out).toLocaleString()} = ${(
+        accountBook.purpose + out
+      ).toLocaleString()} won
       </div>
       `;
 
@@ -484,11 +532,15 @@ account.init({
   template: {
     ui: `
     <div id="wrap">
-      <div id="header">header</div>
+      <div id="header">가계부 (<span id="purpose"></span>)</div>
       <div id="wrapper">
         <div id="board-wrap">
           <div id="board">
-            <div id="total" class="total">000</div>
+            <table id="table">
+              <thead id="thead"></thead>
+              <tbody id="tbody"></tbody>
+            </table>
+            <div id="total" class="total"></div>
           </div>
           <div id="sheets">
             <button class="create sheet"></button>
@@ -531,28 +583,41 @@ account.init({
       created_at,
       updated_at,
     }) => `
-    <div class="record">
-      <button class="del" data-item-id="${id}">❌</button>
-      <span>${id}</span>
-      <span class="memo">${memo}</span>
-      <span class="amount">${amount}</span>
-      <span class="inout">${Boolean(Number(inout)) ? "입금" : "출금"}</span>
-      <span class="category">${category}</span>
+    <tr class="record">
+      <td><button class="del" data-item-id="${id}">❌</button></td>
+      <!-- <span class="">${id}</span> -->
+      <td class="memo">${memo}</td>
+      <td class="amount">${amount.toLocaleString()} ₩</td>
+      <td class="inout">${Boolean(Number(inout)) ? "입금" : "출금"}</td>
+      <td class="category">${category}</td>
       ${
         tags.length > 0
-          ? `<span class="tags">${tags
+          ? `<td class="tags">${tags
               .map((tag) => `<span class="tag">${tag}</span>`)
-              .join("")}</span>`
+              .join("")}</td>`
           : ""
       }
-      <span class="from">${from}</span>
-      <span class="to">${to}</span>
-      <span class="timestamp">${new Date(
+      <td class="from">${from}</td>
+      <td class="to">${to}</td>
+      <td class="timestamp">${new Date(
         created_at < updated_at ? updated_at : created_at
-      ).format("YYYY-MM-dd HH:mm")}</span>
-    </div>`,
+      ).format("YYYY-MM-dd HH:mm")}</td>
+    </tr>`,
     page: ({ id, name }) =>
       `<button class="sheet" data-page-id="${id}">${name}</button>`,
+    column: () => `
+    <tr class="record fields">
+      <td>del</td>
+      <!-- <span>12</span> -->
+      <td class="block memo">memo</td>
+      <td class="block amount">amount</td>
+      <td class="block inout">inout</td>
+      <td class="block category">category</td>
+      <td class="block tags">tags</td>
+      <td class="block from">from</td>
+      <td class="block to">to</td>
+      <td class="block timestamp">timestamp</td>
+    </tr>`,
   },
   model: {},
   crud: {},
