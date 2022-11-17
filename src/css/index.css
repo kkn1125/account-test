@@ -4,6 +4,36 @@ body {
   margin: 0;
   height: 100%;
 }
+html #menu-pop,
+body #menu-pop {
+  user-select: none;
+  cursor: pointer;
+  border: none;
+  background-color: #fff;
+  border-radius: 0.5rem;
+  -webkit-border-radius: 0.5rem;
+  -moz-border-radius: 0.5rem;
+  -ms-border-radius: 0.5rem;
+  -o-border-radius: 0.5rem;
+  box-shadow: 0 0 0.5rem 0 rgba(119, 119, 119, 0.4666666667);
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+}
+html #menu-pop .menu-item,
+body #menu-pop .menu-item {
+  padding: 0.5rem 0.5rem;
+  background-color: #fff;
+}
+html #menu-pop .menu-item:hover,
+body #menu-pop .menu-item:hover {
+  filter: brightness(0.95);
+  -webkit-filter: brightness(0.95);
+}
+html #menu-pop .menu-item:not(:last-child),
+body #menu-pop .menu-item:not(:last-child) {
+  border-bottom: 1px solid #ccc;
+}
 html #app,
 body #app {
   display: flex;

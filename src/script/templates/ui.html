@@ -1,0 +1,50 @@
+<div id="wrap">
+  <div id="header">가계부 (<span id="purpose"></span>)</div>
+  <div id="wrapper">
+    <div id="board-wrap">
+      <div id="board">
+        <table id="table">
+          <thead id="thead"></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        <div id="total" class="total"></div>
+      </div>
+      <div id="sheets">
+        <button class="create sheet"></button>
+      </div>
+    </div>
+    <div id="insert">
+      <div class="item">
+        <select id="inout" class="input">
+          <option value="1">입금</option>
+          <option value="0" selected>출금</option>
+        </select>
+        <input
+          id="amount"
+          class="input"
+          type="number"
+          min="0"
+          step="10"
+          placeholder="1000"
+        />
+        <input id="category" class="input" type="text" placeholder="일상" />
+        <input id="tags" class="input" type="text" placeholder="식대, 개인" />
+        <input id="from" class="input" type="text" placeholder="From" />
+        <input id="to" class="input" type="text" placeholder="To" />
+      </div>
+      <form id="submit" class="item" onsubmin="return false">
+        <textarea
+          class="input"
+          name="memo"
+          id="memo"
+          cols="30"
+          rows="10"
+        ></textarea>
+        <button id="write" class="btn" type="submit">write</button>
+      </form>
+    </div>
+  </div>
+</div>
+<div id="footer">
+  <p>Copyright <span id="year">$year</span>. kimson. All rights reserved.</p>
+</div>

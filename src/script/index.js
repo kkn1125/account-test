@@ -1,3 +1,5 @@
+import { MenuList } from "./menu";
+
 Date.prototype.format = function (format) {
   return format.replace(/YYYY|MM|dd|HH|mm|ss|SSS|AP/g, ($1) => {
     const hour = this.getHours();
@@ -81,7 +83,7 @@ Page.id = 0;
  * 4. 템플릿 처리
  * 5. 렌더 처리
  */
-const account = (function () {
+const account = (function Account() {
   function Controller() {
     let options = null;
     let crud = null;
@@ -94,6 +96,7 @@ const account = (function () {
       window.addEventListener("click", this.handleSelectPage);
       window.addEventListener("click", this.handleSubmit);
       window.addEventListener("click", this.handleDeleteItem);
+      window.addEventListener("contextmenu", this.handleMenuList);
     };
 
     this.handleSelectPage = (e) => {
@@ -170,7 +173,43 @@ const account = (function () {
       if (target.nodeName !== "BUTTON" || !target.classList.contains("del"))
         return;
 
-      crud.deleteItem(Number(target.dataset.itemId));
+      crud.deleteItem(Number(target.closest(".record").dataset.itemId));
+    };
+
+    this.handleMenuList = (e) => {
+      e.preventDefault();
+
+      const target = e.target;
+      const isSheet = target.closest(".sheet");
+      const isRecord = target.closest(".record");
+      if (isSheet) {
+        //
+        console.log("sheet");
+        document.querySelectorAll("#menu-pop").forEach((el) => el.remove());
+        const menulist = new MenuList([
+          { action: "edit", content: "이름 변경" },
+          { action: "left", content: "왼쪽으로 이동" },
+          { action: "right", content: "오른쪽으로 이동" },
+          { action: "del", content: "삭제" },
+        ]);
+        console.log(menulist.list);
+        console.log(menulist.template);
+        document.body.insertAdjacentHTML("beforeend", menulist.template);
+      }
+      if (isRecord) {
+        //
+        console.log("record");
+      }
+      const menuPop = document.querySelector("#menu-pop");
+      const popHeight = menuPop.getBoundingClientRect().height;
+      const winHeight = innerHeight;
+      const isoverBottom =
+        winHeight - (e.clientY + popHeight) < 0 ? true : false;
+      menuPop.style.cssText = `
+        position: fixed;
+        top: ${isoverBottom ? e.clientY - popHeight : e.clientY}px;
+        left: ${e.clientX}px;
+      `;
     };
   }
 
@@ -404,13 +443,14 @@ const account = (function () {
       this.render();
     };
 
-    this.render = () => {
-      view.render(options.ui);
+    this.render = async () => {
+      const ui = options.ui;
+      view.render(ui);
     };
 
     this.update = (accountBook) => {
-      const { page, item, column } = options;
-      view.update({ page, item, column }, accountBook);
+      const { sheet, record, column } = options;
+      view.update({ sheet, record, column }, accountBook);
     };
   }
 
@@ -430,19 +470,28 @@ const account = (function () {
       return document.querySelector(el);
     };
 
-    this.render = (ui) => {
+    this.getElement = () => {
       app = this.$("#app");
-      app.innerHTML = ui || "";
       purpose = this.$("#purpose");
       thead = this.$("#thead");
       tbody = this.$("#tbody");
       sheets = this.$("#sheets");
     };
 
-    this.update = (
-      { page: pageTemplate, item: itemTemplate, column: columnTemplate },
-      accountBook
-    ) => {
+    this.render = async (ui) => {
+      this.getElement();
+      app.innerHTML = (await ui) || "";
+    };
+
+    this.update = async ({ sheet, record, column }, accountBook) => {
+      if (!sheets) {
+        setTimeout(() => {
+          this.getElement();
+          this.update.call(this, { sheet, record, column }, accountBook);
+        }, 1);
+        return;
+      }
+
       let total = 0;
       let inn = 0;
       let out = 0;
@@ -452,29 +501,34 @@ const account = (function () {
           el.remove();
         }
       }
+
       for (let el of [...thead.children]) {
         el.remove();
       }
+
       for (let el of [...tbody.children]) {
         if (!el.classList.contains("total")) {
           el.remove();
         }
       }
+
       purpose.innerHTML = "";
 
       for (let page of accountBook.pages) {
         this.$(".create.sheet").insertAdjacentHTML(
           "beforebegin",
-          pageTemplate(page)
+          await sheet(page)
         );
       }
+
       this.$("#purpose").insertAdjacentHTML(
         "beforeend",
         accountBook.purpose.toLocaleString()
       );
-      this.$("#thead").insertAdjacentHTML("beforeend", columnTemplate());
+
+      this.$("#thead").insertAdjacentHTML("beforeend", await column());
       for (let item of accountBook.pages[accountBook.current].data) {
-        this.$("#tbody").insertAdjacentHTML("beforeend", itemTemplate(item));
+        this.$("#tbody").insertAdjacentHTML("beforeend", await record(item));
 
         if (Boolean(Number(item.inout))) {
           inn += item.amount;
@@ -484,6 +538,7 @@ const account = (function () {
           total -= item.amount;
         }
       }
+
       this.$("#total").innerHTML = `
       <hr />
       <div>
@@ -502,6 +557,7 @@ const account = (function () {
       document
         .querySelectorAll(`.sheet[page-id]`)
         .forEach((el) => el.classList.remove("selected"));
+
       this.$(`.sheet[data-page-id="${accountBook.current}"]`)?.classList.add(
         "selected"
       );
@@ -527,97 +583,65 @@ const account = (function () {
   };
 })();
 
+account.temp = {};
+
+account.temp.record = (
+  html,
+  { id, memo, amount, inout, category, tags, from, to, created_at, updated_at }
+) => {
+  const elements = new DOMParser().parseFromString(html, "text/html");
+  const tr = elements.body.querySelector("tr");
+  tr.dataset.itemId = id;
+  tr.querySelector(".memo").innerHTML = memo;
+  tr.querySelector(".amount").innerHTML = amount.toLocaleString() + " ₩";
+  tr.querySelector(".inout").innerHTML = Boolean(Number(inout))
+    ? "입금"
+    : "출금";
+  tr.querySelector(".category").innerHTML = category;
+  tr.querySelector(".tags").innerHTML =
+    tags.length > 0
+      ? `<td class="tags">${tags
+          .map((tag) => `<span class="tag">${tag}</span>`)
+          .join("")}</td>`
+      : "";
+  tr.querySelector(".from").innerHTML = from;
+  tr.querySelector(".to").innerHTML = to;
+  tr.querySelector(".timestamp").innerHTML = new Date(
+    created_at < updated_at ? updated_at : created_at
+  ).format("YYYY-MM-dd HH:mm");
+  return tr.outerHTML;
+};
+
 account.init({
+  temp: {},
   view: {},
   template: {
-    ui: `
-    <div id="wrap">
-      <div id="header">가계부 (<span id="purpose"></span>)</div>
-      <div id="wrapper">
-        <div id="board-wrap">
-          <div id="board">
-            <table id="table">
-              <thead id="thead"></thead>
-              <tbody id="tbody"></tbody>
-            </table>
-            <div id="total" class="total"></div>
-          </div>
-          <div id="sheets">
-            <button class="create sheet"></button>
-          </div>
-        </div>
-        <div id="insert">
-          <div class="item">
-            <select id="inout" class="input">
-              <option value="1">입금</option>
-              <option value="0" selected>출금</option>
-            </select>
-            <input id="amount" class="input" type="number" min="0" step="10" placeholder="1000" />
-            <input id="category" class="input" type="text" placeholder="일상" />
-            <input id="tags" class="input" type="text" placeholder="식대, 개인" />
-            <input id="from" class="input" type="text" placeholder="From" />
-            <input id="to" class="input" type="text" placeholder="To" />
-          </div>
-          <form id="submit" class="item" onsubmin="return false">
-            <textarea class="input" name="memo" id="memo" cols="30" rows="10"></textarea>
-            <button id="write" class="btn" type="submit">write</button>
-          </form>
-        </div>
-      </div>
-    </div>
-    <div id="footer">
-      <p>
-        Copyright ${new Date().getFullYear()}. kimson. All rights reserved.
-      </p>
-    </div>
-    `,
-    item: ({
-      id,
-      memo,
-      amount,
-      inout,
-      category,
-      tags,
-      from,
-      to,
-      created_at,
-      updated_at,
-    }) => `
-    <tr class="record">
-      <td><button class="del" data-item-id="${id}">❌</button></td>
-      <!-- <span class="">${id}</span> -->
-      <td class="memo">${memo}</td>
-      <td class="amount">${amount.toLocaleString()} ₩</td>
-      <td class="inout">${Boolean(Number(inout)) ? "입금" : "출금"}</td>
-      <td class="category">${category}</td>
-      ${
-        tags.length > 0
-          ? `<td class="tags">${tags
-              .map((tag) => `<span class="tag">${tag}</span>`)
-              .join("")}</td>`
-          : ""
-      }
-      <td class="from">${from}</td>
-      <td class="to">${to}</td>
-      <td class="timestamp">${new Date(
-        created_at < updated_at ? updated_at : created_at
-      ).format("YYYY-MM-dd HH:mm")}</td>
-    </tr>`,
-    page: ({ id, name }) =>
+    ui: account.temp.ui
+      ? account.temp.ui
+      : fetch("./src/script/templates/ui.html")
+          .then((response) => response.text())
+          .then((html) => {
+            account.temp.ui = html;
+            return html;
+          }),
+    record: (info) =>
+      // fetch가 요청마다 발생해서 미리 fetch를 받아와 저장시킴
+      account.temp.recordTemptlate
+        ? account.temp.record(account.temp.recordTemptlate, info)
+        : fetch("./src/script/templates/record.html")
+            .then((response) => response.text())
+            .then((html) => {
+              account.temp.recordTemptlate = html;
+              return account.temp.record(html, info);
+            }),
+    sheet: ({ id, name }) =>
       `<button class="sheet" data-page-id="${id}">${name}</button>`,
-    column: () => `
-    <tr class="record fields">
-      <td>del</td>
-      <!-- <span>12</span> -->
-      <td class="block memo">memo</td>
-      <td class="block amount">amount</td>
-      <td class="block inout">inout</td>
-      <td class="block category">category</td>
-      <td class="block tags">tags</td>
-      <td class="block from">from</td>
-      <td class="block to">to</td>
-      <td class="block timestamp">timestamp</td>
-    </tr>`,
+    column: () =>
+      account.temp.column
+        ? account.temp.column
+        : fetch("./src/script/templates/column.html")
+            .then((response) => response.text())
+            .then((html) => (account.temp.column = html)),
   },
   model: {},
   crud: {},
