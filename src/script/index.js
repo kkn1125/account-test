@@ -92,18 +92,24 @@ const account = (function Account() {
       options = _options;
       crud = _crud;
 
-      window.addEventListener("click", this.handleAddPage);
-      window.addEventListener("click", this.handleSelectPage);
-      window.addEventListener("click", this.handleSubmit);
-      window.addEventListener("click", this.handleDeleteItem);
+      window.addEventListener("click", this.clickHandler);
+      // window.addEventListener("click", this.handleAddPage);
+      // window.addEventListener("click", this.handleSelectPage);
+      // window.addEventListener("click", this.handleSubmit);
+      // window.addEventListener("click", this.handleDeleteItem);
       window.addEventListener("contextmenu", this.handleMenuList);
     };
 
-    this.handleSelectPage = (e) => {
+    this.clickHandler = (e) => {
       e.preventDefault();
-
       const target = e.target;
+      this.handleSelectPage(target);
+      this.handleAddPage(target);
+      this.handleSubmit(target);
+      this.handleDeleteItem(target);
+    }
 
+    this.handleSelectPage = (target) => {
       if (
         target.nodeName !== "BUTTON" ||
         target.classList.contains("create") ||
@@ -113,11 +119,7 @@ const account = (function Account() {
       crud.changeCurrent(Number(target.dataset.pageId));
     };
 
-    this.handleAddPage = (e) => {
-      e.preventDefault();
-
-      const target = e.target;
-
+    this.handleAddPage = (target) => {
       if (
         target.nodeName !== "BUTTON" ||
         !target.classList.contains("create") ||
@@ -128,10 +130,7 @@ const account = (function Account() {
       crud.addPage();
     };
 
-    this.handleSubmit = (e) => {
-      e.preventDefault();
-
-      const target = e.target;
+    this.handleSubmit = (target) => {
       const submit = target.closest("form#submit.item");
       if (!submit || target.nodeName !== "BUTTON") return;
       const ta = submit.querySelector("textarea");
@@ -144,9 +143,6 @@ const account = (function Account() {
       const from = document.querySelector("#from");
       const to = document.querySelector("#to");
 
-      // if (values.trim().length === 0) {
-      //   return;
-      // } else {
       crud.addItem({
         memo: values.trim(),
         inout: inout.value,
@@ -163,13 +159,9 @@ const account = (function Account() {
       tags.value = "";
       from.value = "";
       to.value = "";
-      // }
     };
 
-    this.handleDeleteItem = (e) => {
-      e.preventDefault();
-
-      const target = e.target;
+    this.handleDeleteItem = (target) => {
       if (target.nodeName !== "BUTTON" || !target.classList.contains("del"))
         return;
 
